@@ -26,7 +26,24 @@
 
     .grid{display:grid; grid-template-columns:1fr; gap:20px}
     /* iPad: single column; desktop: 2 columns */
-    @media (min-width:1200px){.grid{grid-template-columns:auto 26rem}}
+    /* Two-column layout starting at iPad landscape */
+    @media (min-width:1024px){
+      .grid{grid-template-columns:auto 22rem}
+    }
+    /* Tighten for 1024–1199px to fit reels + score */
+    @media (min-width:1024px) and (max-width:1199px){
+      .grid{grid-template-columns:auto 20rem}
+      .reel{width:200px}
+      .reels{column-gap:16px}
+      .btn{width:160px}
+    }
+    /* Spacious desktop */
+    @media (min-width:1280px){
+      .grid{grid-template-columns:auto 26rem}
+      .reel{width:220px}
+      .reels{column-gap:24px}
+      .btn{width:180px}
+    }
 
     /* Frosted cards */
     .card{background:var(--card); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); border:1px solid var(--card-border); border-radius:24px; box-shadow:inset 0 1px 1px rgba(255,255,255,.18), var(--shadow)}
