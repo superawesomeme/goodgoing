@@ -155,9 +155,9 @@
             </div>
           </div>
           <div class="controls">
-            <button class="btn spin" id="btnSpin">SPIN</button>
-            <button class="btn reset" id="btnReset">RESET</button>
-            <button class="btn options" id="btnOptions">Options</button>
+            <button type="button" class="btn spin" id="btnSpin">SPIN</button>
+            <button type="button" class="btn reset" id="btnReset">RESET</button>
+            <button type="button" class="btn options" id="btnOptions" aria-label="Options">Options</button>
           </div>
           <div class="status" id="status">Press SPIN to play!</div>
         </div>
@@ -473,6 +473,12 @@
   resetTokens(); buildScoreboard(); resetReelsForActive(); renderAll();
   // Show setup on first load
   openModal();
-  </script>
+
+  // extra-safe: delegate options click in case the direct listener fails
+  document.addEventListener('click', (e)=>{
+    const btn = e.target && e.target.closest ? e.target.closest('#btnOptions') : null;
+    if(btn){ e.preventDefault(); openModal(); }
+  });
+</script>
 </body>
 </html>
