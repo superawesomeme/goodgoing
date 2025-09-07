@@ -69,7 +69,7 @@
     .btn.spin{background:linear-gradient(135deg,var(--accent),#ef4444); color:#111; box-shadow:0 12px 24px rgba(0,0,0,.35)}
     .btn.spin:disabled{opacity:.7; cursor:not-allowed; background:#475569; color:#e2e8f0; border-color:#475569}
     .btn.reset{background:rgba(255,255,255,.1); color:#e2e8f0; border:1px solid rgba(255,255,255,.15)}
-    .btn.options{background:rgba(255,255,255,.1); color:#e2e8f0; border:1px solid rgba(255,255,255,.15); font-size:20px}
+    .btn.options{background:rgba(255,255,255,.1); color:#e2e8f0; border:1px solid rgba(255,255,255,.15)}
     .status{font-size:12px; color:var(--muted); text-align:center; margin-top:8px}
 /* badge for non-zero 'This spin' */
 .spin-badge{display:inline-grid; place-items:center; min-width:28px; height:28px; padding:0 6px; border-radius:9999px; background:#fff; color:#111; font-weight:900; box-shadow:0 2px 6px rgba(0,0,0,.35)}
@@ -84,6 +84,7 @@
     .gamble{height:28px; padding:0 10px; border-radius:12px; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.1); color:#fff; font-weight:800; cursor:pointer}
     .gamble[disabled]{opacity:.5; cursor:not-allowed}
     .armed{background:linear-gradient(135deg,#22c55e,#16a34a); color:#072b18; border-color:#0f5132}
+    .locked{background:rgba(255,255,255,.18); color:#94a3b8; border-color:rgba(255,255,255,.25)}
 
     /* Wobble for spin feel */
     @keyframes wobble{0%,100%{transform:translateY(0) rotate(0deg)}25%{transform:translateY(-2%) rotate(-1.1deg)}50%{transform:translateY(.6%) rotate(.9deg)}75%{transform:translateY(-1%) rotate(-.7deg)}}
@@ -156,7 +157,7 @@
           <div class="controls">
             <button class="btn spin" id="btnSpin">SPIN</button>
             <button class="btn reset" id="btnReset">RESET</button>
-            <button class="btn options" id="btnOptions" title="Options">⚙️</button>
+            <button class="btn options" id="btnOptions">Options</button>
           </div>
           <div class="status" id="status">Press SPIN to play!</div>
         </div>
@@ -195,271 +196,283 @@
     </div>
   </div>
 
-<script>
-/* ---------------------------- Data & utilities ---------------------------- */
-const COLORS = [
-  { name: 'Red',    hex: '#ef4444' },
-  { name: 'Green',  hex: '#22c55e' },
-  { name: 'Blue',   hex: '#3b82f6' },
-  { name: 'Yellow', hex: '#eab308' },
-  { name: 'Pink',   hex: '#ec4899' },
-  { name: 'Brown',  hex: '#92400e' },
-  { name: 'White',  hex: '#ffffff' },
-  { name: 'Black',  hex: '#000000' },
-];
-const REEL_WEIGHTS = [1,2,3];
-const newPoints = () => Object.fromEntries(COLORS.map(c=>[c.name,0]));
+  <script>
+  // --- Data ------------------------------------------------------------------
+  const COLORS = [
+    { name: 'Red',    hex: '#ef4444' },
+    { name: 'Green',  hex: '#22c55e' },
+    { name: 'Blue',   hex: '#3b82f6' },
+    { name: 'Yellow', hex: '#eab308' },
+    { name: 'Pink',   hex: '#ec4899' },
+    { name: 'Brown',  hex: '#92400e' },
+    { name: 'White',  hex: '#ffffff' },
+    { name: 'Black',  hex: '#000000' },
+  ];
+  const REEL_WEIGHTS = [1,2,3];
+  const newPoints = () => Object.fromEntries(COLORS.map(c=>[c.name,0]));
 
-// shading utils
-const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
-const hexToRgb=(hex)=>{let h=hex.replace('#',''); if(h.length===3) h=h.split('').map(x=>x+x).join(''); const num=parseInt(h,16); return {r:(num>>16)&255,g:(num>>8)&255,b:num&255}};
-const rgbToHex=(r,g,b)=>`#${[r,g,b].map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,'0')).join('')}`;
-const shade=(hex,p)=>{const {r,g,b}=hexToRgb(hex); const t=p<0?0:255; const P=Math.abs(p)/100; return rgbToHex(r+(t-r)*P,g+(t-g)*P,b+(t-b)*P)};
+  // --- Shading util ----------------------------------------------------------
+  const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
+  const hexToRgb=(hex)=>{let h=hex.replace('#',''); if(h.length===3) h=h.split('').map(x=>x+x).join(''); const num=parseInt(h,16); return {r:(num>>16)&255,g:(num>>8)&255,b:num&255}};
+  const rgbToHex=(r,g,b)=>`#${[r,g,b].map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,'0')).join('')}`;
+  const shade=(hex,p)=>{const {r,g,b}=hexToRgb(hex); const t=p<0?0:255; const P=Math.abs(p)/100; return rgbToHex(r+(t-r)*P, g+(t-g)*P, b+(t-b)*P)};
 
-// horseshoe (no rivets)
-function horseshoeSVG(color){
-  const uid = Math.random().toString(36).slice(2);
-  const rimLight = shade(color,35), rimDark = shade(color,-45);
-  const light = shade(color,28), dark = shade(color,-28);
-  const outerPath = "M50 7C24 7 7 24 7 50v32h18V50c0-13.8 11.2-25 25-25s25 11.2 25 25v32h18V50C93 24 76 7 50 7Z";
-  const innerPath = "M50 23c-14 0-25 11-25 25v34h12V48c0-7.2 5.8-13 13-13s13 5.8 13 13v34h12V48c0-14-11-25-25-25Z";
-  return `
-  <svg viewBox="0 0 100 100" width="120" height="120" style="filter:drop-shadow(0 8px 10px rgba(0,0,0,.35))">
-    <defs>
-      <linearGradient id="body-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%"  stop-color="${rimLight}"/><stop offset="38%" stop-color="${light}"/><stop offset="100%" stop-color="${dark}"/>
-      </linearGradient>
-      <linearGradient id="rim-${uid}" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%"  stop-color="${rimLight}"/><stop offset="100%" stop-color="${rimDark}"/>
-      </linearGradient>
-      <linearGradient id="bevel-${uid}" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%"  stop-color="rgba(255,255,255,.85)"/><stop offset="20%" stop-color="rgba(255,255,255,.35)"/><stop offset="60%" stop-color="rgba(255,255,255,.15)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/>
-      </linearGradient>
-    </defs>
-    <path fill="url(#body-${uid})" fill-rule="evenodd" d="${outerPath} ${innerPath}" opacity=".98"/>
-    <path d="${outerPath}" fill="none" stroke="url(#rim-${uid})" stroke-width="2.5" opacity=".9"/>
-    <path d="${innerPath}" fill="url(#bevel-${uid})" opacity=".65"/>
-  </svg>`;
-}
-
-/* ------------------------------- State/DOM -------------------------------- */
-let ACTIVE_INDEXES = COLORS.map((_,i)=>i);
-let reelPos=[0,1,2];
-let spinning=false; 
-let spinPoints=newPoints(); 
-let totals=newPoints();
-let tokens={};      // colour -> remaining tokens
-let pending={};     // colour -> true if armed
-let armedSeq={};    // colour -> spin sequence when armed (for lock)
-let spinSeq=0;      // increments at the start of each spin
-
-const $  = (sel,root=document)=>root.querySelector(sel);
-const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
-
-const reelEls = [$('#reel0'), $('#reel1'), $('#reel2')];
-const btnSpin = $('#btnSpin');
-const btnReset = $('#btnReset');
-const statusEl = $('#status');
-const scoreRowsEl = $('#scoreRows');
-const btnOptions = $('#btnOptions');
-const modal      = $('#modal');
-const colourGrid = $('#colourGrid');
-const btnApply   = $('#btnApply');
-const btnCancel  = $('#btnCancel');
-
-// safe event helper to avoid null crashes
-const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
-
-// rows map
-const rows = {}; // name -> { row, tok, gamble, bar, spin, total }
-
-/* ------------------------------ UI builders ------------------------------- */
-function buildScoreboard(){
-  scoreRowsEl.innerHTML='';
-  Object.keys(rows).forEach(k=>delete rows[k]);
-
-  const activeNames = ACTIVE_INDEXES.map(i=>COLORS[i].name);
-  activeNames.forEach(name=>{
-    const c=COLORS.find(x=>x.name===name);
-    const row=document.createElement('div'); row.className='row';
-    const nameCell=document.createElement('div'); nameCell.innerHTML=`<span class="dot" style="background:${c.hex}"></span><span style="font-weight:600;">${c.name}</span>`;
-    const tokCell=document.createElement('div'); tokCell.innerHTML=`<span class="tok">${tokens[name]??4}</span>`;
-    const gambleCell=document.createElement('div'); const gBtn=document.createElement('button'); gBtn.className='gamble'; gBtn.textContent='GAMBLE'; gambleCell.appendChild(gBtn);
-    const bar=document.createElement('div'); bar.className='bar'; bar.innerHTML='<i></i>';
-    const spin=document.createElement('div'); spin.style.cssText='text-align:right;width:56px;font-weight:700'; spin.textContent='0';
-    const total=document.createElement('div'); total.style.cssText='text-align:right;width:56px;font-weight:700'; total.textContent='0';
-    row.append(nameCell, tokCell, gambleCell, bar, spin, total); scoreRowsEl.appendChild(row);
-    rows[name]={ row, tok:tokCell.firstElementChild, gamble:gBtn, bar:bar.firstElementChild, spin, total };
-    on(gBtn,'click',()=>armGamble(name));
-  });
-  updateGambleButtons();
-}
-
-function resetTokens(){
-  tokens={}; pending={}; armedSeq={};
-  ACTIVE_INDEXES.forEach(i=>{ const n=COLORS[i].name; tokens[n]=4; pending[n]=false; });
-}
-
-function updateGambleButtons(){
-  const activeNames = ACTIVE_INDEXES.map(i=>COLORS[i].name);
-  activeNames.forEach(name=>{
-    const r=rows[name]; if(!r) return;
-    r.tok.textContent = String(tokens[name]??0);
-    const locked = pending[name] && (spinSeq > (armedSeq[name] ?? -1));
-    r.gamble.classList.remove('armed','locked');
-    if (pending[name]){
-      if (locked){
-        r.gamble.textContent = 'LOCKED';
-        r.gamble.classList.add('locked'); r.gamble.disabled = true;
-      } else {
-        r.gamble.textContent = 'ARMED';
-        r.gamble.classList.add('armed'); r.gamble.disabled = false; r.gamble.title='Tap to cancel';
-      }
-    } else {
-      r.gamble.textContent = 'GAMBLE';
-      r.gamble.disabled = (tokens[name]||0) <= 0; r.gamble.title='';
-    }
-  });
-}
-
-function armGamble(name){
-  const isPending = !!pending[name];
-  const isLocked  = isPending && (spinSeq > (armedSeq[name] ?? -1));
-  if (isPending){
-    if (isLocked || spinning) return;          // cannot cancel if locked or during spin
-    pending[name] = false; tokens[name] = (tokens[name]||0) + 1; // refund
-    updateGambleButtons();
-    statusEl.textContent = `${name} gamble cancelled.`;
-    return;
+  // --- Horseshoe (no rivets) -------------------------------------------------
+  function horseshoeSVG(color){
+    const uid = Math.random().toString(36).slice(2);
+    const rimLight = shade(color,35), rimDark = shade(color,-45);
+    const light = shade(color,28), dark = shade(color,-28);
+    const outerPath = "M50 7C24 7 7 24 7 50v32h18V50c0-13.8 11.2-25 25-25s25 11.2 25 25v32h18V50C93 24 76 7 50 7Z";
+    const innerPath = "M50 23c-14 0-25 11-25 25v34h12V48c0-7.2 5.8-13 13-13s13 5.8 13 13v34h12V48c0-14-11-25-25-25Z";
+    return `
+    <svg viewBox="0 0 100 100" width="120" height="120" style="filter:drop-shadow(0 8px 10px rgba(0,0,0,.35))">
+      <defs>
+        <linearGradient id="body-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${rimLight}"/>
+          <stop offset="38%" stop-color="${light}"/>
+          <stop offset="100%" stop-color="${dark}"/>
+        </linearGradient>
+        <linearGradient id="rim-${uid}" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="${rimLight}"/>
+          <stop offset="100%" stop-color="${rimDark}"/>
+        </linearGradient>
+        <linearGradient id="bevel-${uid}" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="rgba(255,255,255,.85)"/>
+          <stop offset="20%" stop-color="rgba(255,255,255,.35)"/>
+          <stop offset="60%" stop-color="rgba(255,255,255,.15)"/>
+          <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+        </linearGradient>
+      </defs>
+      <path fill="url(#body-${uid})" fill-rule="evenodd" d="${outerPath} ${innerPath}" opacity=".98"/>
+      <path d="${outerPath}" fill="none" stroke="url(#rim-${uid})" stroke-width="2.5" opacity=".9"/>
+      <path d="${innerPath}" fill="url(#bevel-${uid})" opacity=".65"/>
+    </svg>`;
   }
-  if ((tokens[name]||0) <= 0) return;          // no tokens
-  tokens[name] -= 1; pending[name] = true; armedSeq[name] = spinSeq;
-  updateGambleButtons();
-  statusEl.textContent = `${name} armed: next hit doubles!`;
-}
 
-/* ------------------------------ Rendering --------------------------------- */
-function renderReel(i){
-  if (!ACTIVE_INDEXES.length) return;
-  const pos=reelPos[i] % ACTIVE_INDEXES.length; const col=COLORS[ACTIVE_INDEXES[pos]]; const reel=reelEls[i];
-  const slot=$('.slot', reel); slot.innerHTML = horseshoeSVG(col.hex);
-  if (spinning) slot.firstElementChild.classList.add('wobble'); else slot.firstElementChild.classList.remove('wobble');
-  $('.label .dot', reel).style.background = col.hex;
-  $('.label .label-text', reel).textContent = col.name;
-}
+  // --- State -----------------------------------------------------------------
+  let ACTIVE_INDEXES = COLORS.map((_,i)=>i); // default: all colours
+  let reelPos=[0,1,2]; // positions within ACTIVE_INDEXES
+  let spinning=false; let spinPoints=newPoints(); let totals=newPoints();
+  let tokens={}; // colour name -> remaining tokens
+  let pending={}; // colour name -> true if armed
+  let armedSeq={}; // colour name -> spin sequence when armed (for lock)
+  let spinSeq=0; // increments at the start of each spin
 
-function renderAll(){
-  if (!ACTIVE_INDEXES.length) return;
-  for(let i=0;i<3;i++) renderReel(i);
-  const maxTotal = Math.max(1, ...ACTIVE_INDEXES.map(i=>totals[COLORS[i].name]||0));
-  ACTIVE_INDEXES.forEach(i=>{
-    const c=COLORS[i]; const r=rows[c.name]; if(!r) return;
-    const v = spinPoints[c.name]||0;
-    if (v>0){ r.spin.innerHTML = `<span class="spin-badge">${v}</span>`; } else { r.spin.textContent = '0'; }
-    r.total.textContent = String(totals[c.name]||0);
-    const pct = Math.min(100, Math.round((totals[c.name]||0)/maxTotal*100));
-    r.bar.style.width = pct + '%'; r.bar.style.background = c.hex;
-  });
-  updateGambleButtons();
-}
+  const $ = (sel,root=document)=>root.querySelector(sel);
+  const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
 
-/* ------------------------------ Effects ----------------------------------- */
-function fireConfetti(targetIdx){
-  const colors = targetIdx.map(i=>COLORS[i].hex);
-  const base={particleCount:100, spread:70, startVelocity:55, ticks:200, gravity:.9, scalar:.9, colors, disableForReducedMotion:true};
-  confetti({...base, origin:{x:.15,y:.2}}); confetti({...base, origin:{x:.5,y:.12}}); confetti({...base, origin:{x:.85,y:.2}});
-  setTimeout(()=>confetti({...base, particleCount:70, origin:{x:.5,y:.18}}),220);
-}
-function fireMegaBurst(targetIndex){
-  const main=COLORS[targetIndex].hex; const colors=[main,'#fbbf24','#ffffff'];
-  const burst=(opts={})=>confetti({particleCount:180, spread:90, startVelocity:70, ticks:220, gravity:.8, scalar:1.1, colors, disableForReducedMotion:true, ...opts});
-  burst({origin:{x:.5,y:.3}}); setTimeout(()=>burst({origin:{x:.25,y:.2}}),120); setTimeout(()=>burst({origin:{x:.75,y:.2}}),240);
-  setTimeout(()=>confetti({particleCount:420, spread:360, startVelocity:55, ticks:260, gravity:.95, scalar:1.2, colors, disableForReducedMotion:true, origin:{x:.5,y:.5}}),380);
-  const end=Date.now()+700; (function frame(){ confetti({particleCount:24, angle:60, spread:50, origin:{x:0,y:.8}, colors}); confetti({particleCount:24, angle:120, spread:50, origin:{x:1,y:.8}, colors}); if(Date.now()<end) requestAnimationFrame(frame); })();
-}
+  const reelEls = [$('#reel0'), $('#reel1'), $('#reel2')];
+  const btnSpin = $('#btnSpin');
+  const btnReset = $('#btnReset');
+  const statusEl = $('#status');
+  const scoreRowsEl = $('#scoreRows');
+  const btnOptions = $('#btnOptions');
+  const modal = $('#modal');
+  const colourGrid = $('#colourGrid');
+  const btnApply = $('#btnApply');
+  const btnCancel = $('#btnCancel');
 
-/* ------------------------------ Spin logic -------------------------------- */
-const randPos = ()=> Math.floor(Math.random()*ACTIVE_INDEXES.length);
-function resetReelsForActive(){ reelPos=[0,1,2].map((p)=> ACTIVE_INDEXES.length? p % ACTIVE_INDEXES.length : 0); }
+  // Build scoreboard rows for active colours
+  const rows = {}; // name -> refs
+  function buildScoreboard(){
+    scoreRowsEl.innerHTML='';
+    Object.keys(rows).forEach(k=>delete rows[k]);
+    const activeNames = ACTIVE_INDEXES.map(i=>COLORS[i].name);
+    activeNames.forEach(name=>{
+      const c = COLORS.find(x=>x.name===name);
+      const row=document.createElement('div'); row.className='row';
+      const nameCell=document.createElement('div'); nameCell.innerHTML = `<span class=\"dot\" style=\"background:${c.hex}\"></span><span style=\"font-weight:600;\">${c.name}</span>`;
+      const tokCell=document.createElement('div'); tokCell.innerHTML = `<span class=\"tok\">${tokens[name]??4}</span>`;
+      const gambleCell=document.createElement('div');
+      const gBtn=document.createElement('button'); gBtn.className='gamble'; gBtn.textContent='GAMBLE'; gambleCell.appendChild(gBtn);
+      const bar=document.createElement('div'); bar.className='bar'; bar.innerHTML='<i></i>';
+      const spin=document.createElement('div'); spin.style.cssText='text-align:right;width:56px;font-weight:700'; spin.textContent='0';
+      const total=document.createElement('div'); total.style.cssText='text-align:right;width:56px;font-weight:700'; total.textContent='0';
+      row.append(nameCell, tokCell, gambleCell, bar, spin, total); scoreRowsEl.appendChild(row);
+      rows[name]={ row, tok:tokCell.firstElementChild, gamble:gBtn, bar:bar.firstElementChild, spin, total };
+      gBtn.addEventListener('click', ()=>armGamble(name));
+    });
+    updateGambleButtons();
+  }
 
-let intervals=[null,null,null];
-let stopCounter=0;
-function startSpin(){
-  if(spinning || ACTIVE_INDEXES.length===0) return;
-  spinning=true; btnSpin.disabled=true; statusEl.textContent='Spinning…';
-  spinSeq++;              // anything armed before this spin is now LOCKED
-  updateGambleButtons();
+  function resetTokens(){
+    tokens={}; pending={}; armedSeq={};
+    ACTIVE_INDEXES.forEach(i=>{ const n=COLORS[i].name; tokens[n]=4; pending[n]=false; });
+  }
 
-  spinPoints=newPoints();
-  const targetPos=[randPos(),randPos(),randPos()];
-  stopCounter=0;
-
-  REEL_WEIGHTS.forEach((w,i)=>{
-    const speed=80+i*30; const duration=1200+i*500+Math.floor(Math.random()*400);
-    intervals[i]=setInterval(()=>{reelPos[i]=(reelPos[i]+1)%ACTIVE_INDEXES.length; renderReel(i);}, speed);
-    setTimeout(()=>{
-      clearInterval(intervals[i]); intervals[i]=null; reelPos[i]=targetPos[i]; renderReel(i);
-      stopCounter++; if(stopCounter===3){
-        const targetIdx = targetPos.map(p=>ACTIVE_INDEXES[p]);
-        // base scoring
-        for(let r=0;r<3;r++){ const colour=COLORS[targetIdx[r]].name; spinPoints[colour]+=REEL_WEIGHTS[r]; }
-        // apply doubles for any armed colours that scored
-        ACTIVE_INDEXES.forEach(ci=>{
-          const name=COLORS[ci].name; if(pending[name] && (spinPoints[name]||0)>0){ spinPoints[name]*=2; pending[name]=false; }
-        });
-        // add to totals
-        Object.keys(spinPoints).forEach(k=> totals[k]=(totals[k]||0)+(spinPoints[k]||0));
-        // celebrate
-        const allMatch = targetIdx[0]===targetIdx[1] && targetIdx[1]===targetIdx[2];
-        if(allMatch) fireMegaBurst(targetIdx[0]); else fireConfetti(targetIdx);
-        spinning=false; btnSpin.disabled=false; statusEl.textContent='Press SPIN to play!';
-        renderAll();
+  function updateGambleButtons(){
+    const activeNames = ACTIVE_INDEXES.map(i=>COLORS[i].name);
+    activeNames.forEach(name=>{
+      const r = rows[name]; if(!r) return;
+      r.tok.textContent = String(tokens[name]??0);
+      const locked = pending[name] && (spinSeq > (armedSeq[name] ?? -1));
+      r.gamble.classList.remove('armed','locked');
+      if (pending[name]){
+        if (locked){
+          r.gamble.textContent = 'LOCKED';
+          r.gamble.classList.add('locked');
+          r.gamble.disabled = true;
+        } else {
+          r.gamble.textContent = 'ARMED';
+          r.gamble.classList.add('armed');
+          r.gamble.disabled = false;
+          r.gamble.title = 'Tap to cancel';
+        }
+      } else {
+        r.gamble.textContent = 'GAMBLE';
+        r.gamble.disabled = (tokens[name]||0) <= 0;
+        r.gamble.title = '';
       }
-    }, duration);
-  });
-  renderAll();
-}
+    });
+  } else {
+        r.gamble.textContent = 'GAMBLE';
+        r.gamble.classList.remove('armed');
+        r.gamble.disabled = (tokens[name]||0) <= 0;
+      }
+    });
+  }
 
-function resetAll(){
-  intervals.forEach(t=>t&&clearInterval(t));
-  spinning=false; btnSpin.disabled=false; statusEl.textContent='Press SPIN to play!';
-  spinSeq=0;
-  spinPoints=newPoints(); totals=newPoints(); resetTokens(); resetReelsForActive(); buildScoreboard(); renderAll();
-}
+  function armGamble(name){
+    const isPending = !!pending[name];
+    const isLocked = isPending && (spinSeq > (armedSeq[name] ?? -1));
+    if (isPending){
+      // Toggle off only if not locked and not spinning
+      if (isLocked || spinning) return;
+      pending[name] = false;
+      tokens[name] = (tokens[name]||0) + 1; // refund
+      updateGambleButtons();
+      statusEl.textContent = `${name} gamble cancelled.`;
+      return;
+    }
+    // Arm if token available
+    if ((tokens[name]||0) <= 0) return;
+    tokens[name] -= 1;
+    pending[name] = true;
+    armedSeq[name] = spinSeq; // will lock on next spin
+    updateGambleButtons();
+    statusEl.textContent = `${name} armed: next hit doubles!`;
+  } armed: next hit doubles!`;
+  }
 
-/* ----------------------------- Wire up & init ------------------------------ */
-on(btnSpin,'click', startSpin);
-on(btnReset,'click', resetAll);
-on(btnOptions,'click', openModal);
-on(btnCancel,'click', closeModal);
-on(btnApply,'click', applyOptions);
+  function renderReel(i){
+    const pos=reelPos[i] % ACTIVE_INDEXES.length; const col=COLORS[ACTIVE_INDEXES[pos]]; const reel=reelEls[i];
+    const slot=$('.slot', reel); slot.innerHTML = horseshoeSVG(col.hex);
+    if (spinning) slot.firstElementChild.classList.add('wobble'); else slot.firstElementChild.classList.remove('wobble');
+    $('.label .dot', reel).style.background = col.hex;
+    $('.label .label-text', reel).textContent = col.name;
+  }
 
-// options modal
-function openModal(){ if(modal){ modal.classList.add('show'); buildOptions(); } }
-function closeModal(){ if(modal){ modal.classList.remove('show'); } }
-function buildOptions(){
-  if(!colourGrid) return;
-  colourGrid.innerHTML='';
-  COLORS.forEach((c,idx)=>{
-    const wrap=document.createElement('label'); wrap.className='color-opt';
-    const cb=document.createElement('input'); cb.type='checkbox'; cb.checked = ACTIVE_INDEXES.includes(idx);
-    const dot=document.createElement('span'); dot.className='dot'; dot.style.background=c.hex;
-    const name=document.createElement('span'); name.textContent=c.name; name.style.fontWeight='700';
-    wrap.append(cb,dot,name); colourGrid.appendChild(wrap); wrap.dataset.idx=idx;
-  });
-}
-function applyOptions(){
-  const selected=[]; $$('#colourGrid label').forEach(l=>{ const cb=l.querySelector('input'); if(cb && cb.checked) selected.push(Number(l.dataset.idx)); });
-  if(selected.length===0){ alert('Please select at least one colour.'); return; }
-  ACTIVE_INDEXES = selected;
-  resetAll(); closeModal();
-}
+  function renderAll(){
+    for(let i=0;i<3;i++) renderReel(i);
+    const maxTotal = Math.max(1, ...ACTIVE_INDEXES.map(i=>totals[COLORS[i].name]||0));
+    ACTIVE_INDEXES.forEach(i=>{
+      const c=COLORS[i]; const r=rows[c.name]; if(!r) return;
+      { const v = spinPoints[c.name]||0; if(v>0){ r.spin.innerHTML = `<span class=\"spin-badge\">${v}</span>`; } else { r.spin.textContent = '0'; } }
+      r.total.textContent = String(totals[c.name]||0);
+      const pct = Math.min(100, Math.round((totals[c.name]||0)/maxTotal*100));
+      r.bar.style.width = pct + '%';
+      r.bar.style.background = c.hex;
+    });
+    updateGambleButtons();
+  }
 
-// init
-resetTokens(); buildScoreboard(); resetReelsForActive(); renderAll();
-// show setup on first load
-openModal();
-</script>
+  // Confetti helpers ----------------------------------------------------------
+  function fireConfetti(targetIdx){
+    const colors = targetIdx.map(i=>COLORS[i].hex);
+    const base={particleCount:100, spread:70, startVelocity:55, ticks:200, gravity:.9, scalar:.9, colors, disableForReducedMotion:true};
+    confetti({...base, origin:{x:.15,y:.2}}); confetti({...base, origin:{x:.5,y:.12}}); confetti({...base, origin:{x:.85,y:.2}});
+    setTimeout(()=>confetti({...base, particleCount:70, origin:{x:.5,y:.18}}),220);
+  }
+  function fireMegaBurst(targetIndex){
+    const main=COLORS[targetIndex].hex; const colors=[main,'#fbbf24','#ffffff'];
+    const burst=(opts={})=>confetti({particleCount:180, spread:90, startVelocity:70, ticks:220, gravity:.8, scalar:1.1, colors, disableForReducedMotion:true, ...opts});
+    burst({origin:{x:.5,y:.3}}); setTimeout(()=>burst({origin:{x:.25,y:.2}}),120); setTimeout(()=>burst({origin:{x:.75,y:.2}}),240);
+    setTimeout(()=>confetti({particleCount:420, spread:360, startVelocity:55, ticks:260, gravity:.95, scalar:1.2, colors, disableForReducedMotion:true, origin:{x:.5,y:.5}}),380);
+    const end=Date.now()+700; (function frame(){ confetti({particleCount:24, angle:60, spread:50, origin:{x:0,y:.8}, colors}); confetti({particleCount:24, angle:120, spread:50, origin:{x:1,y:.8}, colors}); if(Date.now()<end) requestAnimationFrame(frame); })();
+  }
 
+  // Helpers -------------------------------------------------------------------
+  function randPos(){ return Math.floor(Math.random()*ACTIVE_INDEXES.length) }
+  function resetReelsForActive(){ reelPos=[0,1,2].map((p)=> ACTIVE_INDEXES.length? p % ACTIVE_INDEXES.length : 0); }
+
+  // Spin logic ----------------------------------------------------------------
+  let intervals=[null,null,null];
+  let stopCounter=0;
+  function startSpin(){
+    if(spinning || ACTIVE_INDEXES.length===0) return; spinning=true; btnSpin.disabled=true; statusEl.textContent='Spinning…';
+    spinSeq++;
+    updateGambleButtons();
+    // clear previous spin points for active only
+    spinPoints=newPoints();
+    const targetPos=[randPos(), randPos(), randPos()];
+    stopCounter=0;
+
+    REEL_WEIGHTS.forEach((w,i)=>{
+      const speed=80+i*30; const duration=1200+i*500+Math.floor(Math.random()*400);
+      intervals[i]=setInterval(()=>{reelPos[i]=(reelPos[i]+1)%ACTIVE_INDEXES.length; renderReel(i);}, speed);
+      setTimeout(()=>{
+        clearInterval(intervals[i]); intervals[i]=null; reelPos[i]=targetPos[i]; renderReel(i);
+        stopCounter++; if(stopCounter===3){
+          const targetIdx = targetPos.map(p=>ACTIVE_INDEXES[p]);
+          // score base
+          for(let r=0;r<3;r++){ const colour=COLORS[targetIdx[r]].name; spinPoints[colour]+=REEL_WEIGHTS[r]; }
+          // apply gamble doubles
+          ACTIVE_INDEXES.forEach(ci=>{
+            const name=COLORS[ci].name; if(pending[name] && (spinPoints[name]||0)>0){ spinPoints[name]*=2; pending[name]=false; }
+          });
+          // add to totals
+          Object.keys(spinPoints).forEach(k=> totals[k]=(totals[k]||0)+ (spinPoints[k]||0));
+          // confetti & finish
+          const allMatch = targetIdx[0]===targetIdx[1] && targetIdx[1]===targetIdx[2];
+          if(allMatch) fireMegaBurst(targetIdx[0]); else fireConfetti(targetIdx);
+          spinning=false; btnSpin.disabled=false; statusEl.textContent='Press SPIN to play!';
+          renderAll();
+        }
+      }, duration);
+    });
+    renderAll();
+  }
+
+  function resetAll(){
+    intervals.forEach(t=>t&&clearInterval(t));
+    spinning=false; btnSpin.disabled=false; statusEl.textContent='Press SPIN to play!';
+    spinSeq=0;
+    spinPoints=newPoints(); totals=newPoints(); resetTokens(); resetReelsForActive(); buildScoreboard(); renderAll();
+  }
+
+  btnSpin.addEventListener('click', startSpin);
+  btnReset.addEventListener('click', resetAll);
+
+  // Options modal --------------------------------------------------------------
+  function openModal(){ modal.classList.add('show'); buildOptions(); }
+  function closeModal(){ modal.classList.remove('show'); }
+  function buildOptions(){
+    colourGrid.innerHTML='';
+    COLORS.forEach((c,idx)=>{
+      const wrap=document.createElement('label'); wrap.className='color-opt';
+      const cb=document.createElement('input'); cb.type='checkbox'; cb.checked = ACTIVE_INDEXES.includes(idx);
+      const dot=document.createElement('span'); dot.className='dot'; dot.style.background=c.hex;
+      const name=document.createElement('span'); name.textContent=c.name; name.style.fontWeight='700'; 
+      wrap.append(cb,dot,name); colourGrid.appendChild(wrap);
+      wrap.dataset.idx=idx;
+    });
+  }
+  function applyOptions(){
+    const selected=[]; $$('#colourGrid label').forEach(l=>{ const cb=l.querySelector('input'); if(cb.checked) selected.push(Number(l.dataset.idx)); });
+    if(selected.length===0){ alert('Please select at least one colour.'); return; }
+    ACTIVE_INDEXES = selected;
+    resetAll();
+    closeModal();
+  }
+
+  btnOptions.addEventListener('click', openModal);
+  btnCancel.addEventListener('click', closeModal);
+  btnApply.addEventListener('click', applyOptions);
+
+  // Init ----------------------------------------------------------------------
+  resetTokens(); buildScoreboard(); resetReelsForActive(); renderAll();
+  // Show setup on first load
+  openModal();
+  </script>
 </body>
 </html>
